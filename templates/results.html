@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Results - Google Ads Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="fas fa-chart-bar me-2"></i>Campaign Performance Report</h3>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary btn-custom">
+        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+    </a>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                <h5 class="card-title">Total Spend</h5>
+                <h2 class="mb-0">${{ "%.2f"|format(total_spend) }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                <h5 class="card-title">Total Clicks</h5>
+                <h2 class="mb-0">{{ "{:,}".format(total_clicks) }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                <h5 class="card-title">Total Impressions</h5>
+                <h2 class="mb-0">{{ "{:,}".format(total_impressions) }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-custom">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-table me-2"></i>Campaign Details 
+            <span class="badge bg-secondary">{{ date_range }} days</span>
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 table-custom">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Date</th>
+                        <th>Campaign Name</th>
+                        <th>Campaign ID</th>
+                        <th>Cost</th>
+                        <th>Clicks</th>
+                        <th>Impressions</th>
+                        <th>CPM</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in spend_data %}
+                    <tr>
+                        <td>{{ item.date }}</td>
+                        <td>{{ item.campaign_name }}</td>
+                        <td><code class="text-muted">{{ item.campaign_id }}</code></td>
+                        <td><strong>${{ "%.2f"|format(item.cost) }}</strong></td>
+                        <td>{{ "{:,}".format(item.clicks) }}</td>
+                        <td>{{ "{:,}".format(item.impressions) }}</td>
+                        <td>
+                            {% if item.impressions > 0 %}
+                                ${{ "%.2f"|format((item.cost / item.impressions) * 1000) }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4 text-center">
+    <p class="text-muted">
+        <i class="fas fa-info-circle me-1"></i>
+        Report generated for Customer ID: <code>{{ customer_id }}</code> | 
+        Date Range: Last {{ date_range }} days
+    </p>
+</div>
+{% endblock %}

@@ -104,12 +104,11 @@ class GoogleAdsManager:
                     campaign.name,
                     metrics.cost_micros,
                     metrics.impressions,
-                    metrics.clicks,
-                    segments.date
+                    metrics.clicks
                 FROM campaign 
-                WHERE segments.date BETWEEN '{start_date.strftime('%Y-%m-%d')}' 
-                AND '{end_date.strftime('%Y-%m-%d')}'
-                ORDER BY segments.date DESC
+                WHERE campaign.status = 'ENABLED'
+                AND segments.date DURING LAST_30_DAYS
+                ORDER BY campaign.name
             """
             
             print(f"Querying customer ID: {customer_id}")
@@ -122,7 +121,7 @@ class GoogleAdsManager:
                 campaigns_data.append({
                     'campaign_id': row.campaign.id,
                     'campaign_name': row.campaign.name,
-                    'date': row.segments.date,
+                    'date': 'Last 30 days',  # Since we're not using segments.date anymore
                     'cost': row.metrics.cost_micros / 1_000_000,  # Convert micros to currency
                     'impressions': row.metrics.impressions,
                     'clicks': row.metrics.clicks
@@ -131,12 +130,16 @@ class GoogleAdsManager:
             return campaigns_data
         
         except GoogleAdsException as ex:
-            print(f"Request failed with status {ex.error.code().name}")
+            print(f"GoogleAds Request failed: {ex.error.code().name}")
+            print(f"Request ID: {ex.request_id}")
             for error in ex.failure.errors:
-                print(f"\tError with message: {error.message}")
+                print(f"Error message: {error.message}")
+                print(f"Error code: {error.error_code}")
             return None
         except Exception as e:
-            print(f"An error occurred: {e}")
+            print(f"An unexpected error occurred: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
 ads_manager = GoogleAdsManager()

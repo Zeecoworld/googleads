@@ -49,9 +49,31 @@ class GoogleAdsManager:
             print(f"Error initializing client: {e}")
             return False
     
+    def test_account_access(self, customer_id):
+        """Test if we can access the customer account"""
+        try:
+            customer_service = self.client.get_service("CustomerService")
+            customer = customer_service.get_customer(
+                resource_name=f"customers/{customer_id}"
+            )
+            print(f"✅ Account access successful: {customer.descriptive_name}")
+            return True
+        except GoogleAdsException as ex:
+            print(f"❌ Account access failed: {ex.error.code().name}")
+            for error in ex.failure.errors:
+                print(f"Error: {error.message}")
+            return False
+        except Exception as e:
+            print(f"❌ Unexpected error: {e}")
+            return False
+    
     def get_campaign_spend_data(self, customer_id, date_range_days=30):
         """Fetch campaign spend data for the specified date range"""
         if not self.client:
+            return None
+        
+        # Test account access first
+        if not self.test_account_access(customer_id):
             return None
         
         try:
@@ -74,6 +96,9 @@ class GoogleAdsManager:
                 AND '{end_date.strftime('%Y-%m-%d')}'
                 ORDER BY segments.date DESC
             """
+            
+            print(f"Querying customer ID: {customer_id}")
+            print(f"Query: {query}")
             
             response = ga_service.search(customer_id=customer_id, query=query)
             
@@ -147,6 +172,9 @@ def fetch_data():
     
     # Remove any formatting from customer ID
     customer_id = customer_id.replace('-', '').replace(' ', '')
+    
+    # Debug: Print the customer ID being used
+    print(f"Debug - Customer ID: {customer_id}")
     
     spend_data = ads_manager.get_campaign_spend_data(customer_id, date_range)
     

@@ -52,16 +52,31 @@ class GoogleAdsManager:
     def test_account_access(self, customer_id):
         """Test if we can access the customer account"""
         try:
-            customer_service = self.client.get_service("CustomerService")
-            customer = customer_service.get_customer(
-                resource_name=f"customers/{customer_id}"
-            )
-            print(f"✅ Account access successful: {customer.descriptive_name}")
+            # Use a simple query to test account access
+            ga_service = self.client.get_service("GoogleAdsService")
+            
+            query = """
+                SELECT customer.id, customer.descriptive_name
+                FROM customer
+                LIMIT 1
+            """
+            
+            response = ga_service.search(customer_id=customer_id, query=query)
+            
+            # Try to get the first row
+            for row in response:
+                print(f"✅ Account access successful: {row.customer.descriptive_name} (ID: {row.customer.id})")
+                return True
+            
+            # If we get here, the query returned no results but didn't error
+            print(f"⚠️ Account accessible but no customer data returned")
             return True
+            
         except GoogleAdsException as ex:
             print(f"❌ Account access failed: {ex.error.code().name}")
             for error in ex.failure.errors:
                 print(f"Error: {error.message}")
+                print(f"Error code: {error.error_code}")
             return False
         except Exception as e:
             print(f"❌ Unexpected error: {e}")

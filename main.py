@@ -102,12 +102,12 @@ class GoogleAdsManager:
                 SELECT 
                     campaign.id,
                     campaign.name,
+                    campaign.status,
                     metrics.cost_micros,
                     metrics.impressions,
                     metrics.clicks
                 FROM campaign 
-                WHERE campaign.status = 'ENABLED'
-                AND segments.date DURING LAST_30_DAYS
+                WHERE segments.date DURING LAST_30_DAYS
                 ORDER BY campaign.name
             """
             
@@ -121,11 +121,16 @@ class GoogleAdsManager:
                 campaigns_data.append({
                     'campaign_id': row.campaign.id,
                     'campaign_name': row.campaign.name,
-                    'date': 'Last 30 days',  # Since we're not using segments.date anymore
-                    'cost': row.metrics.cost_micros / 1_000_000,  # Convert micros to currency
+                    'campaign_status': row.campaign.status.name,  # Add status
+                    'date': 'Last 30 days',
+                    'cost': row.metrics.cost_micros / 1_000_000,
                     'impressions': row.metrics.impressions,
                     'clicks': row.metrics.clicks
                 })
+            
+            print(f"Found {len(campaigns_data)} campaigns")
+            for campaign in campaigns_data:
+                print(f"Campaign: {campaign['campaign_name']} - Status: {campaign['campaign_status']} - Spend: ${campaign['cost']}")
             
             return campaigns_data
         

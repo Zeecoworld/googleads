@@ -1,75 +1,208 @@
 {% extends "base.html" %}
-
 {% block title %}Results - Google Ads Tracker{% endblock %}
+
+{% block extra_head %}
+<style>
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+    }
+
+    .metric-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .ai-insights-box {
+        background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%);
+        border-radius: 15px;
+        padding: 2rem;
+        margin-top: 2rem;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .ai-insights-box::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        animation: shimmer 3s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(180deg); }
+    }
+
+    .ai-icon {
+        background: rgba(255,255,255,0.2);
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        backdrop-filter: blur(10px);
+    }
+
+    .campaign-row:hover {
+        background-color: #f8f9fa;
+        transition: all 0.3s ease;
+    }
+
+    .loading-insights {
+        text-align: center;
+        padding: 2rem;
+        color: #6c757d;
+    }
+
+    .insights-text {
+        font-size: 1.1rem;
+        line-height: 1.6;
+        color: #2d3748;
+        position: relative;
+        z-index: 1;
+    }
+
+    .stats-card {
+        transition: transform 0.3s ease;
+    }
+
+    .stats-card:hover {
+        transform: translateY(-3px);
+    }
+
+    .table-custom {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .card-custom {
+        border: none;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .btn-custom {
+        border-radius: 8px;
+        padding: 0.5rem 1.5rem;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h3><i class="fas fa-chart-bar me-2"></i>Campaign Performance Report</h3>
+    <div>
+        <h3><i class="fas fa-chart-bar me-2"></i>Campaign Performance Report</h3>
+        <p class="text-muted mb-0">Customer ID: {{ customer_id }} | Last {{ date_range }} days</p>
+    </div>
     <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary btn-custom">
         <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
     </a>
 </div>
 
+<!-- Key Metrics Row -->
 <div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card stats-card">
-            <div class="card-body text-center">
-                <h5 class="card-title">Total Spend</h5>
-                <h2 class="mb-0">${{ "%.2f"|format(total_spend) }}</h2>
-            </div>
+    <div class="col-md-3">
+        <div class="metric-card">
+            <i class="fas fa-dollar-sign fa-2x mb-2"></i>
+            <h4>${{ "%.2f"|format(total_spend) }}</h4>
+            <p class="mb-0">Total Spend</p>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card stats-card">
-            <div class="card-body text-center">
-                <h5 class="card-title">Total Clicks</h5>
-                <h2 class="mb-0">{{ "{:,}".format(total_clicks) }}</h2>
-            </div>
+    <div class="col-md-3">
+        <div class="metric-card">
+            <i class="fas fa-mouse-pointer fa-2x mb-2"></i>
+            <h4>{{ "{:,}".format(total_clicks) }}</h4>
+            <p class="mb-0">Total Clicks</p>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card stats-card">
-            <div class="card-body text-center">
-                <h5 class="card-title">Total Impressions</h5>
-                <h2 class="mb-0">{{ "{:,}".format(total_impressions) }}</h2>
-            </div>
+    <div class="col-md-3">
+        <div class="metric-card">
+            <i class="fas fa-eye fa-2x mb-2"></i>
+            <h4>{{ "{:,}".format(total_impressions) }}</h4>
+            <p class="mb-0">Total Impressions</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="metric-card">
+            <i class="fas fa-percentage fa-2x mb-2"></i>
+            <h4>{{ "%.2f"|format((total_clicks / total_impressions * 100) if total_impressions > 0 else 0) }}%</h4>
+            <p class="mb-0">Overall CTR</p>
         </div>
     </div>
 </div>
 
-<div class="card card-custom">
-    <div class="card-header">
+<!-- Campaign Data Table -->
+<div class="card shadow card-custom">
+    <div class="card-header bg-white">
         <h5 class="mb-0">
-            <i class="fas fa-table me-2"></i>Campaign Details 
-            <span class="badge bg-secondary">{{ date_range }} days</span>
+            <i class="fas fa-list me-2"></i>Campaign Details
+            {% if spend_data|length > 0 %}
+                <span class="badge bg-primary ms-2">{{ spend_data|length }} campaigns</span>
+            {% endif %}
         </h5>
     </div>
     <div class="card-body p-0">
+        {% if spend_data|length > 0 %}
         <div class="table-responsive">
             <table class="table table-hover mb-0 table-custom">
                 <thead class="table-dark">
                     <tr>
-                        <th>Date</th>
                         <th>Campaign Name</th>
-                        <th>Campaign ID</th>
-                        <th>Cost</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Spend</th>
                         <th>Clicks</th>
                         <th>Impressions</th>
+                        <th>CTR</th>
+                        <th>CPC</th>
                         <th>CPM</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in spend_data %}
-                    <tr>
-                        <td>{{ item.date }}</td>
-                        <td>{{ item.campaign_name }}</td>
-                        <td><code class="text-muted">{{ item.campaign_id }}</code></td>
-                        <td><strong>${{ "%.2f"|format(item.cost) }}</strong></td>
-                        <td>{{ "{:,}".format(item.clicks) }}</td>
-                        <td>{{ "{:,}".format(item.impressions) }}</td>
+                    {% for campaign in spend_data %}
+                    {% set ctr = (campaign.clicks / campaign.impressions * 100) if campaign.impressions > 0 else 0 %}
+                    {% set cpc = (campaign.cost / campaign.clicks) if campaign.clicks > 0 else 0 %}
+                    {% set cpm = (campaign.cost / campaign.impressions * 1000) if campaign.impressions > 0 else 0 %}
+                    <tr class="campaign-row">
                         <td>
-                            {% if item.impressions > 0 %}
-                                ${{ "%.2f"|format((item.cost / item.impressions) * 1000) }}
+                            <strong>{{ campaign.campaign_name }}</strong>
+                            <br>
+                            <small class="text-muted">ID: {{ campaign.campaign_id }}</small>
+                        </td>
+                        <td>
+                            {% if campaign.campaign_status is defined %}
+                                <span class="badge bg-{{ 'success' if campaign.campaign_status == 'ENABLED' else 'secondary' }}">
+                                    {{ campaign.campaign_status }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-info">ACTIVE</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ campaign.date }}</td>
+                        <td><strong>${{ "%.2f"|format(campaign.cost) }}</strong></td>
+                        <td>{{ "{:,}".format(campaign.clicks) }}</td>
+                        <td>{{ "{:,}".format(campaign.impressions) }}</td>
+                        <td>
+                            <span class="{% if ctr > 2 %}text-success{% elif ctr > 1 %}text-warning{% else %}text-danger{% endif %}">
+                                {{ "%.2f"|format(ctr) }}%
+                            </span>
+                        </td>
+                        <td>${{ "%.2f"|format(cpc) }}</td>
+                        <td>
+                            {% if cpm > 0 %}
+                                ${{ "%.2f"|format(cpm) }}
                             {% else %}
                                 N/A
                             {% endif %}
@@ -79,6 +212,49 @@
                 </tbody>
             </table>
         </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">No Campaigns Found</h4>
+            <p class="text-muted">No campaigns were found for the specified date range.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- AI Insights Section -->
+{% if spend_data|length > 0 %}
+<div class="ai-insights-box">
+    <div class="ai-icon">
+        <i class="fas fa-robot fa-2x text-white"></i>
+    </div>
+    <h4 class="text-center mb-3" style="color: #2d3748;">
+        <i class="fas fa-brain me-2"></i>AI Campaign Insights
+    </h4>
+    
+    <div id="aiInsightsContent">
+        <div class="loading-insights" id="loadingInsights">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>AI is analyzing your campaign data...</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Action Buttons -->
+<div class="row mt-4 mb-5">
+    <div class="col-12 text-center">
+        <button class="btn btn-primary me-2" onclick="window.print()">
+            <i class="fas fa-print me-1"></i>Print Report
+        </button>
+        <button class="btn btn-outline-secondary me-2" onclick="location.reload()">
+            <i class="fas fa-sync-alt me-1"></i>Refresh Data
+        </button>
+        <button class="btn btn-outline-info" onclick="refreshAIInsights()">
+            <i class="fas fa-brain me-1"></i>Refresh AI Insights
+        </button>
     </div>
 </div>
 
@@ -89,4 +265,112 @@
         Date Range: Last {{ date_range }} days
     </p>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Function to load AI insights via AJAX
+    function loadAIInsights() {
+        const customerID = '{{ customer_id }}';
+        const dateRange = {{ date_range }};
+        
+        fetch('/get_ai_insights', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                customer_id: customerID,
+                date_range: dateRange,
+                spend_data: {{ spend_data|tojson }}
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            updateAIInsights(data);
+        })
+        .catch(error => {
+            console.error('Error loading AI insights:', error);
+            showAIError('Failed to load AI insights. Please try again.');
+        });
+    }
+
+    // Function to update AI insights content
+    function updateAIInsights(data) {
+        const contentDiv = document.getElementById('aiInsightsContent');
+        
+        if (data.success) {
+            contentDiv.innerHTML = `
+                <div class="insights-text text-center">
+                    ${data.analysis}
+                </div>
+                
+                <div class="row mt-3 text-center">
+                    <div class="col-md-6">
+                        <small class="text-muted">
+                            <i class="fas fa-chart-line me-1"></i>
+                            Best Performer: 
+                            ${data.metrics && data.metrics.best_campaign ? 
+                                `${data.metrics.best_campaign.name.substring(0, 20)}... (${data.metrics.best_campaign.ctr.toFixed(1)}% CTR)` : 
+                                'N/A'
+                            }
+                        </small>
+                    </div>
+                    <div class="col-md-6">
+                        <small class="text-muted">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            Needs Attention: 
+                            ${data.metrics && data.metrics.worst_campaign ? 
+                                `${data.metrics.worst_campaign.name.substring(0, 20)}... (${data.metrics.worst_campaign.ctr.toFixed(1)}% CTR)` : 
+                                'N/A'
+                            }
+                        </small>
+                    </div>
+                </div>
+            `;
+        } else {
+            showAIError(data.error || 'Unable to generate AI insights at this time.');
+        }
+    }
+
+    // Function to show AI error
+    function showAIError(message) {
+        const contentDiv = document.getElementById('aiInsightsContent');
+        contentDiv.innerHTML = `
+            <div class="insights-text text-center">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                ${message}
+            </div>
+        `;
+    }
+
+    // Function to refresh AI insights
+    function refreshAIInsights() {
+        const contentDiv = document.getElementById('aiInsightsContent');
+        contentDiv.innerHTML = `
+            <div class="loading-insights">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>AI is analyzing your campaign data...</p>
+            </div>
+        `;
+        loadAIInsights();
+    }
+
+    // Auto-hide loading spinner after 15 seconds if no response
+    setTimeout(function() {
+        const loadingElement = document.getElementById('loadingInsights');
+        if (loadingElement && loadingElement.style.display !== 'none') {
+            showAIError('AI insights are taking longer than expected. Please ensure the AI service is configured properly.');
+        }
+    }, 15000);
+
+    // Load AI insights when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if spend_data|length > 0 %}
+            loadAIInsights();
+        {% endif %}
+    });
+</script>
 {% endblock %}

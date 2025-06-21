@@ -181,6 +181,7 @@ def dashboard():
     
     return render_template('dashboard.html')
 
+
 @app.route('/fetch_data', methods=['POST'])
 def fetch_data():
     if not session.get('ads_configured'):
@@ -201,19 +202,32 @@ def fetch_data():
     
     spend_data = ads_manager.get_campaign_spend_data(customer_id, date_range)
     
-    if spend_data:
-        # Calculate totals
-        total_spend = sum(item['cost'] for item in spend_data)
-        total_clicks = sum(item['clicks'] for item in spend_data)
-        total_impressions = sum(item['impressions'] for item in spend_data)
-        
-        return render_template('results.html', 
-                             spend_data=spend_data,
-                             total_spend=total_spend,
-                             total_clicks=total_clicks,
-                             total_impressions=total_impressions,
-                             customer_id=customer_id,
-                             date_range=date_range)
-    else:
+    # Check if spend_data is None (error occurred) vs empty list (no campaigns)
+    if spend_data is None:
         flash('Failed to fetch data. Please check your customer ID and try again.', 'error')
         return redirect(url_for('dashboard'))
+    
+    # spend_data is a list (could be empty)
+    if len(spend_data) == 0:
+        flash('No campaigns found for the specified date range. This account may not have any active campaigns.', 'info')
+        # You can still show the results page with zero totals
+        return render_template('results.html', 
+                             spend_data=[],
+                             total_spend=0,
+                             total_clicks=0,
+                             total_impressions=0,
+                             customer_id=customer_id,
+                             date_range=date_range)
+    
+    # Calculate totals for non-empty data
+    total_spend = sum(item['cost'] for item in spend_data)
+    total_clicks = sum(item['clicks'] for item in spend_data)
+    total_impressions = sum(item['impressions'] for item in spend_data)
+    
+    return render_template('results.html', 
+                         spend_data=spend_data,
+                         total_spend=total_spend,
+                         total_clicks=total_clicks,
+                         total_impressions=total_impressions,
+                         customer_id=customer_id,
+                         date_range=date_range)

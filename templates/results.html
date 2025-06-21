@@ -232,14 +232,73 @@
         <i class="fas fa-brain me-2"></i>AI Campaign Insights
     </h4>
     
-    <div id="aiInsightsContent">
-        <div class="loading-insights" id="loadingInsights">
-            <div class="spinner-border text-primary mb-3" role="status">
-                <span class="visually-hidden">Loading...</span>
+    {% if ai_insights %}
+        {% if ai_insights.success %}
+            <div class="insights-text text-center">
+                {{ ai_insights.analysis }}
             </div>
-            <p>AI is analyzing your campaign data...</p>
+            
+            <!-- Show key metrics that influenced the analysis -->
+            {% if ai_insights.metrics %}
+            <div class="row mt-3 text-center">
+                <div class="col-md-6">
+                    <small class="text-muted">
+                        <i class="fas fa-chart-line me-1"></i>
+                        Best Performer: 
+                        {% if ai_insights.metrics.best_campaign %}
+                            {{ ai_insights.metrics.best_campaign.name[:20] }}...
+                            ({{ "%.1f"|format(ai_insights.metrics.best_campaign.ctr) }}% CTR)
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </small>
+                </div>
+                <div class="col-md-6">
+                    <small class="text-muted">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        Needs Attention: 
+                        {% if ai_insights.metrics.worst_campaign %}
+                            {{ ai_insights.metrics.worst_campaign.name[:20] }}...
+                            ({{ "%.1f"|format(ai_insights.metrics.worst_campaign.ctr) }}% CTR)
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+            <div class="row mt-2 text-center">
+                <div class="col-md-4">
+                    <small class="text-muted">
+                        <i class="fas fa-percentage me-1"></i>
+                        Overall CTR: {{ "%.2f"|format(ai_insights.metrics.overall_ctr) }}%
+                    </small>
+                </div>
+                <div class="col-md-4">
+                    <small class="text-muted">
+                        <i class="fas fa-dollar-sign me-1"></i>
+                        Avg CPC: ${{ "%.2f"|format(ai_insights.metrics.overall_cpc) }}
+                    </small>
+                </div>
+                <div class="col-md-4">
+                    <small class="text-muted">
+                        <i class="fas fa-play-circle me-1"></i>
+                        Active: {{ ai_insights.metrics.active_campaigns }}/{{ ai_insights.metrics.total_campaigns }}
+                    </small>
+                </div>
+            </div>
+            {% endif %}
+        {% else %}
+            <div class="insights-text text-center">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                {{ ai_insights.error }}
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="insights-text text-center">
+            <i class="fas fa-info-circle me-2"></i>
+            AI insights are not available. Please ensure Replicate API is configured properly.
         </div>
-    </div>
+    {% endif %}
 </div>
 {% endif %}
 
@@ -251,9 +310,6 @@
         </button>
         <button class="btn btn-outline-secondary me-2" onclick="location.reload()">
             <i class="fas fa-sync-alt me-1"></i>Refresh Data
-        </button>
-        <button class="btn btn-outline-info" onclick="refreshAIInsights()">
-            <i class="fas fa-brain me-1"></i>Refresh AI Insights
         </button>
     </div>
 </div>
@@ -269,108 +325,33 @@
 
 {% block extra_scripts %}
 <script>
-    // Function to load AI insights via AJAX
-    function loadAIInsights() {
-        const customerID = '{{ customer_id }}';
-        const dateRange = {{ date_range }};
-        
-        fetch('/get_ai_insights', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                customer_id: customerID,
-                date_range: dateRange,
-                spend_data: {{ spend_data|tojson }}
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            updateAIInsights(data);
-        })
-        .catch(error => {
-            console.error('Error loading AI insights:', error);
-            showAIError('Failed to load AI insights. Please try again.');
-        });
-    }
-
-    // Function to update AI insights content
-    function updateAIInsights(data) {
-        const contentDiv = document.getElementById('aiInsightsContent');
-        
-        if (data.success) {
-            contentDiv.innerHTML = `
-                <div class="insights-text text-center">
-                    ${data.analysis}
-                </div>
-                
-                <div class="row mt-3 text-center">
-                    <div class="col-md-6">
-                        <small class="text-muted">
-                            <i class="fas fa-chart-line me-1"></i>
-                            Best Performer: 
-                            ${data.metrics && data.metrics.best_campaign ? 
-                                `${data.metrics.best_campaign.name.substring(0, 20)}... (${data.metrics.best_campaign.ctr.toFixed(1)}% CTR)` : 
-                                'N/A'
-                            }
-                        </small>
-                    </div>
-                    <div class="col-md-6">
-                        <small class="text-muted">
-                            <i class="fas fa-exclamation-triangle me-1"></i>
-                            Needs Attention: 
-                            ${data.metrics && data.metrics.worst_campaign ? 
-                                `${data.metrics.worst_campaign.name.substring(0, 20)}... (${data.metrics.worst_campaign.ctr.toFixed(1)}% CTR)` : 
-                                'N/A'
-                            }
-                        </small>
-                    </div>
-                </div>
-            `;
-        } else {
-            showAIError(data.error || 'Unable to generate AI insights at this time.');
-        }
-    }
-
-    // Function to show AI error
-    function showAIError(message) {
-        const contentDiv = document.getElementById('aiInsightsContent');
-        contentDiv.innerHTML = `
-            <div class="insights-text text-center">
-                <i class="fas fa-exclamation-circle me-2"></i>
-                ${message}
-            </div>
-        `;
-    }
-
-    // Function to refresh AI insights
-    function refreshAIInsights() {
-        const contentDiv = document.getElementById('aiInsightsContent');
-        contentDiv.innerHTML = `
-            <div class="loading-insights">
-                <div class="spinner-border text-primary mb-3" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p>AI is analyzing your campaign data...</p>
-            </div>
-        `;
-        loadAIInsights();
-    }
-
-    // Auto-hide loading spinner after 15 seconds if no response
-    setTimeout(function() {
-        const loadingElement = document.getElementById('loadingInsights');
-        if (loadingElement && loadingElement.style.display !== 'none') {
-            showAIError('AI insights are taking longer than expected. Please ensure the AI service is configured properly.');
-        }
-    }, 15000);
-
-    // Load AI insights when page loads
+    // Simple page enhancement scripts
     document.addEventListener('DOMContentLoaded', function() {
-        {% if spend_data|length > 0 %}
-            loadAIInsights();
-        {% endif %}
+        // Add smooth scrolling to AI insights if they exist
+        const aiInsights = document.querySelector('.ai-insights-box');
+        if (aiInsights) {
+            // Add a subtle entrance animation
+            aiInsights.style.opacity = '0';
+            aiInsights.style.transform = 'translateY(20px)';
+            aiInsights.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            
+            setTimeout(() => {
+                aiInsights.style.opacity = '1';
+                aiInsights.style.transform = 'translateY(0)';
+            }, 500);
+        }
+        
+        // Add hover effects to metric cards
+        const metricCards = document.querySelectorAll('.metric-card');
+        metricCards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-8px) scale(1.02)';
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(-5px) scale(1)';
+            });
+        });
     });
 </script>
 {% endblock %}

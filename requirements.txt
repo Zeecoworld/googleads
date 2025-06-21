@@ -26,7 +26,7 @@ pyasn1_modules==0.4.2
 python-dotenv==1.1.0
 PyYAML==6.0.2
 requests==2.32.4
-replicate 1.0.7
+replicate==1.0.7
 requests-oauthlib==2.0.0
 rsa==4.9.1
 urllib3==2.4.0

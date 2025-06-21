@@ -4,6 +4,12 @@ from google.ads.googleads.client import GoogleAdsClient
 from google.ads.googleads.errors import GoogleAdsException
 import yaml
 from datetime import datetime, timedelta
+import replicate
+import json
+from typing import Dict, List, Any
+
+# Add to your environment variables
+
 import os
 
 from dotenv import load_dotenv
@@ -12,6 +18,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY')
+REPLICATE_API_TOKEN = os.getenv('REPLICATE_API_TOKEN')
 
 # Configuration
 GOOGLE_ADS_CONFIG = {
@@ -149,6 +156,113 @@ class GoogleAdsManager:
 
 ads_manager = GoogleAdsManager()
 
+
+
+class ReplicateAIAnalyst:
+    def __init__(self, api_token: str):
+        if api_token:
+            os.environ["REPLICATE_API_TOKEN"] = api_token
+            self.client = replicate
+        else:
+            self.client = None
+    
+    def get_quick_insights(self, campaigns_data: List[Dict], total_spend: float, 
+                          total_clicks: int, total_impressions: int) -> Dict[str, Any]:
+        """Get quick 2-sentence AI insights about campaign performance"""
+        
+        if not self.client:
+            return {
+                'success': False,
+                'error': 'Replicate API not configured'
+            }
+        
+        try:
+            # Calculate key metrics
+            overall_ctr = (total_clicks / total_impressions * 100) if total_impressions > 0 else 0
+            overall_cpc = (total_spend / total_clicks) if total_clicks > 0 else 0
+            
+            # Prepare summary data
+            active_campaigns = len([c for c in campaigns_data if c['campaign_status'] == 'ENABLED'])
+            total_campaigns = len(campaigns_data)
+            
+            # Find best and worst performing campaigns by CTR
+            campaign_performance = []
+            for campaign in campaigns_data:
+                ctr = (campaign['clicks'] / campaign['impressions'] * 100) if campaign['impressions'] > 0 else 0
+                campaign_performance.append({
+                    'name': campaign['campaign_name'],
+                    'ctr': ctr,
+                    'spend': campaign['cost']
+                })
+            
+            campaign_performance.sort(key=lambda x: x['ctr'], reverse=True)
+            best_campaign = campaign_performance[0] if campaign_performance else None
+            worst_campaign = campaign_performance[-1] if campaign_performance else None
+            
+            # Create concise prompt for 2-sentence analysis
+            prompt = f"""
+            As a Google Ads expert, analyze this campaign data and provide EXACTLY 2 sentences of actionable advice:
+
+            Performance Summary:
+            - Total Spend: ${total_spend:.2f}
+            - Total Clicks: {total_clicks}
+            - Overall CTR: {overall_ctr:.2f}%
+            - Overall CPC: ${overall_cpc:.2f}
+            - Active Campaigns: {active_campaigns}/{total_campaigns}
+            
+            Best Performer: {best_campaign['name'] if best_campaign else 'None'} (CTR: {best_campaign['ctr']:.2f}%)
+            Worst Performer: {worst_campaign['name'] if worst_campaign else 'None'} (CTR: {worst_campaign['ctr']:.2f}%)
+            
+            Provide exactly 2 sentences with specific, actionable advice for improving campaign performance.
+            """
+            
+            # Use Llama 2 70B model for analysis
+            output = self.client.run(
+                "meta/llama-2-70b-chat:02e509c789964a7ea8736978a43525956ef40397be9033abf9fd2badfe68c9e3",
+                input={
+                    "prompt": prompt,
+                    "max_new_tokens": 200,
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "repetition_penalty": 1.15
+                }
+            )
+            
+            # Join the output if it's a generator/list
+            if hasattr(output, '__iter__') and not isinstance(output, str):
+                analysis_text = ''.join(output)
+            else:
+                analysis_text = str(output)
+            
+            # Clean up the response to ensure it's concise
+            sentences = analysis_text.strip().split('.')
+            if len(sentences) >= 2:
+                final_analysis = '. '.join(sentences[:2]) + '.'
+            else:
+                final_analysis = analysis_text.strip()
+            
+            return {
+                'success': True,
+                'analysis': final_analysis,
+                'metrics': {
+                    'overall_ctr': round(overall_ctr, 2),
+                    'overall_cpc': round(overall_cpc, 2),
+                    'active_campaigns': active_campaigns,
+                    'total_campaigns': total_campaigns,
+                    'best_campaign': best_campaign,
+                    'worst_campaign': worst_campaign
+                }
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"AI analysis failed: {str(e)}"
+            }
+
+# Initialize Replicate AI Analyst
+replicate_analyst = ReplicateAIAnalyst(REPLICATE_API_TOKEN) if REPLICATE_API_TOKEN else None
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -197,32 +311,29 @@ def fetch_data():
     # Remove any formatting from customer ID
     customer_id = customer_id.replace('-', '').replace(' ', '')
     
-    # Debug: Print the customer ID being used
     print(f"Debug - Customer ID: {customer_id}")
     
     spend_data = ads_manager.get_campaign_spend_data(customer_id, date_range)
     
-    # Check if spend_data is None (error occurred) vs empty list (no campaigns)
     if spend_data is None:
         flash('Failed to fetch data. Please check your customer ID and try again.', 'error')
         return redirect(url_for('dashboard'))
     
-    # spend_data is a list (could be empty)
-    if len(spend_data) == 0:
-        flash('No campaigns found for the specified date range. This account may not have any active campaigns.', 'info')
-        # You can still show the results page with zero totals
-        return render_template('results.html', 
-                             spend_data=[],
-                             total_spend=0,
-                             total_clicks=0,
-                             total_impressions=0,
-                             customer_id=customer_id,
-                             date_range=date_range)
-    
-    # Calculate totals for non-empty data
+    # Calculate totals
     total_spend = sum(item['cost'] for item in spend_data)
     total_clicks = sum(item['clicks'] for item in spend_data)
     total_impressions = sum(item['impressions'] for item in spend_data)
+    
+    # Get AI insights if data is available
+    ai_insights = None
+    if replicate_analyst and len(spend_data) > 0:
+        print("Generating AI insights...")
+        ai_insights = replicate_analyst.get_quick_insights(
+            spend_data, total_spend, total_clicks, total_impressions
+        )
+    
+    if len(spend_data) == 0:
+        flash('No campaigns found for the specified date range.', 'info')
     
     return render_template('results.html', 
                          spend_data=spend_data,
@@ -230,4 +341,5 @@ def fetch_data():
                          total_clicks=total_clicks,
                          total_impressions=total_impressions,
                          customer_id=customer_id,
-                         date_range=date_range)
+                         date_range=date_range,
+                         ai_insights=ai_insights)

@@ -296,6 +296,7 @@ def dashboard():
     return render_template('dashboard.html')
 
 
+
 @app.route('/fetch_data', methods=['POST'])
 def fetch_data():
     if not session.get('ads_configured'):
@@ -311,29 +312,32 @@ def fetch_data():
     # Remove any formatting from customer ID
     customer_id = customer_id.replace('-', '').replace(' ', '')
     
+    # Debug: Print the customer ID being used
     print(f"Debug - Customer ID: {customer_id}")
     
     spend_data = ads_manager.get_campaign_spend_data(customer_id, date_range)
     
+    # Check if spend_data is None (error occurred) vs empty list (no campaigns)
     if spend_data is None:
         flash('Failed to fetch data. Please check your customer ID and try again.', 'error')
         return redirect(url_for('dashboard'))
     
-    # Calculate totals
+    # spend_data is a list (could be empty)
+    if len(spend_data) == 0:
+        flash('No campaigns found for the specified date range. This account may not have any active campaigns.', 'info')
+        # You can still show the results page with zero totals
+        return render_template('results.html', 
+                             spend_data=[],
+                             total_spend=0,
+                             total_clicks=0,
+                             total_impressions=0,
+                             customer_id=customer_id,
+                             date_range=date_range)
+    
+    # Calculate totals for non-empty data
     total_spend = sum(item['cost'] for item in spend_data)
     total_clicks = sum(item['clicks'] for item in spend_data)
     total_impressions = sum(item['impressions'] for item in spend_data)
-    
-    # Get AI insights if data is available
-    ai_insights = None
-    if replicate_analyst and len(spend_data) > 0:
-        print("Generating AI insights...")
-        ai_insights = replicate_analyst.get_quick_insights(
-            spend_data, total_spend, total_clicks, total_impressions
-        )
-    
-    if len(spend_data) == 0:
-        flash('No campaigns found for the specified date range.', 'info')
     
     return render_template('results.html', 
                          spend_data=spend_data,
@@ -341,5 +345,52 @@ def fetch_data():
                          total_clicks=total_clicks,
                          total_impressions=total_impressions,
                          customer_id=customer_id,
-                         date_range=date_range,
-                         ai_insights=ai_insights)
+                         date_range=date_range)
+
+# @app.route('/fetch_data', methods=['POST'])
+# def fetch_data():
+#     if not session.get('ads_configured'):
+#         return redirect(url_for('setup'))
+    
+#     customer_id = request.form.get('customer_id')
+#     date_range = int(request.form.get('date_range', 30))
+    
+#     if not customer_id:
+#         flash('Please provide a customer ID.', 'error')
+#         return redirect(url_for('dashboard'))
+    
+#     # Remove any formatting from customer ID
+#     customer_id = customer_id.replace('-', '').replace(' ', '')
+    
+#     print(f"Debug - Customer ID: {customer_id}")
+    
+#     spend_data = ads_manager.get_campaign_spend_data(customer_id, date_range)
+    
+#     if spend_data is None:
+#         flash('Failed to fetch data. Please check your customer ID and try again.', 'error')
+#         return redirect(url_for('dashboard'))
+    
+#     # Calculate totals
+#     total_spend = sum(item['cost'] for item in spend_data)
+#     total_clicks = sum(item['clicks'] for item in spend_data)
+#     total_impressions = sum(item['impressions'] for item in spend_data)
+    
+#     # Get AI insights if data is available
+#     ai_insights = None
+#     if replicate_analyst and len(spend_data) > 0:
+#         print("Generating AI insights...")
+#         ai_insights = replicate_analyst.get_quick_insights(
+#             spend_data, total_spend, total_clicks, total_impressions
+#         )
+    
+#     if len(spend_data) == 0:
+#         flash('No campaigns found for the specified date range.', 'info')
+    
+#     return render_template('results.html', 
+#                          spend_data=spend_data,
+#                          total_spend=total_spend,
+#                          total_clicks=total_clicks,
+#                          total_impressions=total_impressions,
+#                          customer_id=customer_id,
+#                          date_range=date_range,
+#                          ai_insights=ai_insights)
